@@ -38,6 +38,7 @@ public class ScalableImageView extends ImageView implements ViewTreeObserver.OnG
     private float mLastX;   // 记录上一次事件的位置
     private float mLastY;   // 记录上一次时间的位置
     private float mPivotX;  // 记录上一次缩放中心点的x轴位置
+    private float mPivotY;  // 记录上一次缩放中心点的y轴位置
     private float mDoubleTapScaleUp;    // 双击手势默认放大倍数
     private OnSingleTapListener mOnSingleTapListener = null;
     private OnLongPressListener mOnLongPressListener = null;
@@ -127,10 +128,12 @@ public class ScalableImageView extends ImageView implements ViewTreeObserver.OnG
     @Override
     public boolean onScale(ScaleGestureDetector detector) {
         final float pivotX = detector.getFocusX();
+        final float pivotY = detector.getFocusY();
         final int height = getHeight();
         float scale = detector.getScaleFactor();
 
         mPivotX = pivotX;
+        mPivotY = pivotY;
 
         float currentScale = getCurrentScale();  // 获取当前缩放倍数
         if (scale * currentScale > mOverMaxScale) {
@@ -138,9 +141,14 @@ public class ScalableImageView extends ImageView implements ViewTreeObserver.OnG
         } else if (scale * currentScale < mOverMinScale) {
             scale = mOverMinScale / currentScale;
         }
-        mMatrix.postScale(scale, scale, pivotX, height / 2.0f); // 缩放中心x轴为缩放手势中心，y轴为对称缩放
 
-        checkImageBounds();  // 由于x轴为不对称缩放，如果是缩小的话，故要重新调整图片居中
+        float currentHeight = getMatrixRectF().height();
+        if (currentHeight < height) {
+            mMatrix.postScale(scale, scale, mPivotX, height / 2.0f);   // 图片高度小于控件高度时y轴对称缩放时图片居中
+        } else {
+            mMatrix.postScale(scale, scale, pivotX, pivotY);
+        }
+        checkImageBounds();  // 由于不对称缩放，需要重新调整图片居中
 
         setImageMatrix(mMatrix);
         return true;
@@ -366,9 +374,9 @@ public class ScalableImageView extends ImageView implements ViewTreeObserver.OnG
     public boolean onDoubleTap(MotionEvent e) {
         final float currentScale = getCurrentScale();
         if (currentScale >= mDoubleTapScaleUp) {
-            scaleAnimate(currentScale, mInitScale, getWidth() / 2.0f, getHeight() / 2.0f);
+            scaleAnimate(currentScale, mInitScale, e.getX(), e.getY());
         } else {
-            scaleAnimate(currentScale, mDoubleTapScaleUp, getWidth() / 2.0f, getHeight() / 2.0f);
+            scaleAnimate(currentScale, mDoubleTapScaleUp, e.getX(), getHeight() / 2.0f);
         }
         return true;
     }
